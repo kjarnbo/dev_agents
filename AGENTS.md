@@ -1,14 +1,16 @@
 # dev_agents — map for agents working on this repo
 
-This repo IS a harness: three phase agents (strategizer → planner → coder) plus three read-only helpers
-(explorer, standards-discoverer, reviewer) for GitHub Copilot in VS Code. This file is a map, not a manual.
+This repo IS a harness for GitHub Copilot in VS Code: three phase agents (strategizer → planner → coder), helpers
+(explorer, standards-discoverer, reviewer), `ask` (read-only Q&A for users) and `rule-curator` (turns durable rules into proposals). This file is a map, not a manual.
 
 ## Where things live
-- `.github/agents/*.agent.md` — the six agents (flat folder, one file each)
+- `.github/agents/*.agent.md` — the eight agents (flat folder, one file each)
+- `.github/hooks/` — hook config; `rule-signals.json` logs rule-like prompts
+- `.github/harness/proposals/` — rule proposals (pending / applied / rejected)
 - `.github/harness/CONTROLS.md` — every control, why it exists, how it is enforced, when to re-justify it
 - `.github/harness/DECISIONS.md` — dated decisions and the evidence behind them
 - `.github/harness/templates/` — brief, plan, progress, review templates
-- `.github/harness/scripts/` — verify, scope_check, standards_cache, harness_lint (stdlib Python only)
+- `.github/harness/scripts/` — verify, scope_check, standards_cache, rule_signals, harness_lint (stdlib Python only)
 - `.github/harness/tests/` — tests for the scripts and the lint
 - `.github/agents/README.md` — human-facing overview and usage
 
@@ -23,6 +25,7 @@ This repo IS a harness: three phase agents (strategizer → planner → coder) p
 4. Keep this file at 100 lines or fewer and each agent body at 90 lines or fewer (the lint enforces both).
 5. Never pin a `model:` in agent frontmatter without an eval that justifies it.
 6. Remove a rule before adding a new one when they overlap.
+7. A user-stated rule goes through `rule-curator`: propose, user approves, then apply. Never edit rules directly.
 
 ## Resuming interrupted work
 Work state lives in files, not in chat. Active work is in `docs/exec-plans/active/<date>-<slug>/`;

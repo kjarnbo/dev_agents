@@ -8,6 +8,10 @@ handoffs:
     agent: coder
     prompt: Resume from the active plan folder and implement 01-plan.md step by step.
     send: false
+  - label: Propose as a rule
+    agent: rule-curator
+    prompt: Review the rule-like statement from my last message and propose it.
+    send: false
 ---
 
 # Planner — HOW, decided up front
@@ -36,3 +40,9 @@ Read `02-progress.md` in the active plan folder. If `01-plan.md` already exists,
 - Every file named in a step is covered by `allowed_files`.
 - Every anchor was seen in a file you read. No line numbers anywhere.
 - Gates exist (`.github/harness/gates.json` or verified cache). If not, say so in the plan.
+
+## Rule check
+If the user states something durable rather than one-off ("always", "never", "from now on", "we use...",
+a correction that would recur), finish the task first, then end with one line:
+`Possible general rule: "<their words>" — use "Propose as a rule" to review it.`
+Never edit rule or agent files yourself.

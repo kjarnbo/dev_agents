@@ -17,3 +17,10 @@ re-justify it with evidence by its review date, or delete it. `harness_lint.py` 
 | Longest agent hop chain at most 4 | Handoff chains beyond 4 failed in a production agent | harness_lint | 2027-02-21 |
 | Coder repair limit of 3 attempts, then stop | Unbounded self-repair loops burn quota and drift out of scope | advisory (reviewer checks progress log) | 2027-02-21 |
 | Reviewer ignores Coder narrative | Self-evaluation is biased toward approving own work | advisory | 2027-02-21 |
+| `ask` and `explorer` have no `execute` tool; `ask` also has no `edit` | Exploring must never change the codebase, even by running a command | frontmatter + harness_lint | 2027-02-21 |
+| Rule-like prompts are detected by a hook and logged to a git-ignored file | Relying on each agent to notice a durable rule means it gets missed | script: rule_signals.py via .github/hooks (hook support unverified in your VS Code build) | 2027-02-21 |
+| Phase agents flag possible rules at the end of a reply | Fallback when hooks are off | advisory | 2027-02-21 |
+| Rules change only via a proposal the user approves (`apply <slug>`) | Auto-edited instructions bloat and rot; generated context lowers success | advisory (rule-curator) + proposal lint | 2027-02-21 |
+| Pending proposals expire after 30 days; applied rules carry a review-by date | Proposal pile-up and stale rules | harness_lint | 2027-02-21 |
+| Rule application edits only the proposal's `allowed_files` | An approved rule should not widen into unrelated edits | script: scope_check.py (curator must run it) | 2027-02-21 |
+| Hook configs must be valid and point at existing scripts | A dead hook fails silently | harness_lint | 2027-02-21 |

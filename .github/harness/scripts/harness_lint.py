@@ -5,6 +5,7 @@ Every message says how to fix the problem, because the reader is usually an agen
 """
 import argparse
 import datetime
+import json
 import re
 import sys
 from pathlib import Path
@@ -15,7 +16,12 @@ import fm  # noqa: E402
 MAX_AGENTS_MD_LINES = 100
 MAX_AGENT_BODY_LINES = 90
 MAX_HOPS = 4
-READ_ONLY = {"explorer", "reviewer", "standards-discoverer"}
+READ_ONLY = {"explorer", "reviewer", "standards-discoverer", "ask"}
+NO_EXECUTE = {"explorer", "ask"}  # roles that must not run commands at all
+MAX_PENDING_DAYS = 30
+PROPOSAL_STATUS = {"pending", "applied", "rejected"}
+PROPOSAL_DEST = {"project-rule", "agent-behavior", "enforced-control"}
+PROPOSAL_REQUIRED = ("status", "created", "destination", "statement", "why", "review_by")
 
 
 def _agent_files(root):
@@ -55,6 +61,8 @@ def lint(root, today=None):
             errors.append(f"{rel}: 'tools' contains '*'. List only the tools this role needs.")
         elif name in READ_ONLY and "edit" in tools:
             errors.append(f"{rel}: read-only role '{name}' has the 'edit' tool. Remove 'edit' from tools.")
+        if isinstance(tools, list) and name in NO_EXECUTE and "execute" in tools:
+            errors.append(f"{rel}: role '{name}' must not run commands but has the 'execute' tool. Remove 'execute' from tools.")
         if "agents" not in meta:
             errors.append(f"{rel}: 'agents' is not set. Add 'agents: []' (or list allowed subagents) so subagent use is explicit.")
         subs = meta.get("agents") if isinstance(meta.get("agents"), list) else []
@@ -98,7 +106,64 @@ def lint(root, today=None):
                 errors.append(f"CONTROLS.md row '{cells[0][:40]}': needs 4 cells ending in a YYYY-MM-DD review-by date.")
             elif datetime.date.fromisoformat(cells[3]) < today:
                 errors.append(f"CONTROLS.md control '{cells[0][:40]}' passed its review-by date {cells[3]}. Re-justify it with evidence, or delete it.")
+    _lint_proposals(root, today, errors)
+    _lint_hooks(root, errors)
     return errors, warnings
+
+
+def _date(v):
+    try:
+        return datetime.date.fromisoformat(str(v))
+    except ValueError:
+        return None
+
+
+def _lint_proposals(root, today, errors):
+    d = root / ".github" / "harness" / "proposals"
+    if not d.is_dir():
+        return
+    for f in sorted(d.glob("*.md")):
+        meta, _ = fm.parse(f.read_text())
+        rel = f.relative_to(root)
+        missing = [k for k in PROPOSAL_REQUIRED if not meta.get(k)]
+        if missing:
+            errors.append(f"{rel}: missing frontmatter {missing}. Copy .github/harness/templates/04-rule-proposal.md.")
+            continue
+        if meta["status"] not in PROPOSAL_STATUS:
+            errors.append(f"{rel}: status '{meta['status']}' must be one of {sorted(PROPOSAL_STATUS)}.")
+        if meta["destination"] not in PROPOSAL_DEST:
+            errors.append(f"{rel}: destination '{meta['destination']}' must be one of {sorted(PROPOSAL_DEST)}.")
+        created, review = _date(meta["created"]), _date(meta["review_by"])
+        if not created or not review:
+            errors.append(f"{rel}: 'created' and 'review_by' must be YYYY-MM-DD.")
+            continue
+        if meta["status"] == "rejected" and not meta.get("reason"):
+            errors.append(f"{rel}: rejected proposals need a 'reason' so the rule is not proposed again.")
+        if meta["status"] == "pending" and (today - created).days > MAX_PENDING_DAYS:
+            errors.append(f"{rel}: pending for {(today - created).days} days (max {MAX_PENDING_DAYS}). Apply it or reject it with a reason.")
+        if meta["status"] == "applied" and review < today:
+            errors.append(f"{rel}: applied rule passed its review-by date {review}. Re-justify it with evidence, or remove it.")
+
+
+def _lint_hooks(root, errors):
+    d = root / ".github" / "hooks"
+    if not d.is_dir():
+        return
+    for f in sorted(d.glob("*.json")):
+        rel = f.relative_to(root)
+        try:
+            cfg = json.loads(f.read_text())
+        except ValueError:
+            errors.append(f"{rel}: invalid JSON. Fix the syntax.")
+            continue
+        if cfg.get("version") != 1:
+            errors.append(f"{rel}: 'version' must be 1.")
+        for event, entries in (cfg.get("hooks") or {}).items():
+            for e in entries:
+                cmd = " ".join(str(e.get(k, "")) for k in ("bash", "powershell"))
+                for path in sorted(set(re.findall(r"\.github/[^\s\"']+\.py", cmd))):
+                    if not (root / path).exists():
+                        errors.append(f"{rel}: '{event}' runs missing script {path}. Fix the path or delete the hook.")
 
 
 def main():

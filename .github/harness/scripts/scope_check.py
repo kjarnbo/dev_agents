@@ -43,7 +43,7 @@ def check(root, plan_path):
     if branch in PROTECTED:
         violations.append(f"On protected branch '{branch}'. Run: git switch -c agent/<slug> before editing.")
     for f in sorted(changed_files(root, base)):
-        if f.startswith((plan_dir, ".github/cache/")) or any(fnmatch.fnmatch(f, g) for g in allowed):
+        if f.startswith((plan_dir, ".github/cache/", ".github/harness/proposals/")) or any(fnmatch.fnmatch(f, g) for g in allowed):
             continue
         violations.append(f"Out-of-scope change: {f}. Revert it (git checkout -- {f}) or stop and ask the Planner to amend allowed_files.")
     return violations

@@ -29,3 +29,21 @@ Sources: arXiv 2608.23550; Marmelab.
 
 ## 2026-11-21 — Stale `model:` pins removed
 Why: gpt-4o / gpt-4o-mini pins date from Oct 2025. Controls that compensate for a model's weaknesses rot as models improve.
+
+## 2026-11-21 — `ask`: a user-facing read-only guide, separate from `explorer`
+Why: `explorer` is a subagent that returns pointers to other agents. Users need cited, evidence-labelled answers about
+configuration and behaviour. Different audience, different output, so a separate agent. Tools are `search`, `read`, `agent`
+only; lint forbids `edit` and `execute`, so "without changing it" is enforced, not requested.
+Sources: Vercel (read-only explorer, context isolation); Marmelab (restrict subagent tools).
+
+## 2026-11-21 — Rule capture: deterministic detection, model judgement, human approval
+Why: durable user rules were lost when they appeared only in chat. Detection is a hook plus a regex heuristic, which is
+cheap and does not depend on the model remembering. Judgement and placement are the rule-curator's. Nothing changes without
+an explicit `apply`. Prefer a script or frontmatter control over prose.
+Limits: the heuristic is English-only and will miss rules phrased without signal words; the hook only logs, because I
+could not confirm that Copilot hook output can inject context. The in-chat flag is the fallback.
+Sources: Marmelab (every control needs an incident and an expiry; generated context hurts); arXiv 2608.23550 (prose rules
+are rarely backed by a control).
+
+## 2026-11-21 — Proposal lifecycle keeps rejected proposals
+Why: a record of declined rules stops the same rule being proposed repeatedly. Pending proposals expire after 30 days.

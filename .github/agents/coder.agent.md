@@ -8,6 +8,10 @@ handoffs:
     agent: reviewer
     prompt: Review the active plan's change against the brief. Ignore the Coder's own claims.
     send: false
+  - label: Propose as a rule
+    agent: rule-curator
+    prompt: Review the rule-like statement from my last message and propose it.
+    send: false
 ---
 
 # Coder — executes the plan
@@ -38,3 +42,9 @@ if missing). Continue from the first unchecked step. Never redo a ticked step.
 ## Final report: scoped claims only
 State each command you ran and its result. Separate failures you caused from pre-existing ones. Say what you did
 NOT run. Never write "tests pass" or "looks good" without command output behind it.
+
+## Rule check
+If the user states something durable rather than one-off ("always", "never", "from now on", "we use...",
+a correction that would recur), finish the task first, then end with one line:
+`Possible general rule: "<their words>" — use "Propose as a rule" to review it.`
+Never edit rule or agent files yourself.
