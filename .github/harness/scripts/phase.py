@@ -9,13 +9,20 @@ docs/exec-plans/active/<slug>/02-progress.md. `Phase` names the NEXT phase to ru
   put-review <folder> < text   write <folder>/03-review.md from stdin (the reviewer's only write path)
 Folders must live under docs/exec-plans/. Exit: 0 ok, 1 invalid state, 2 bad arguments.
 """
+
 import argparse
 import re
 import sys
 from pathlib import Path
 
-PHASES = {"brief": "strategizer", "plan": "planner", "implement": "coder", "review": "reviewer", "done": None}
-PHASE_RE = re.compile(r"^Phase:\s*([A-Za-z-]+)", re.M)
+PHASES = {
+    "brief": "strategizer",
+    "plan": "planner",
+    "implement": "coder",
+    "review": "reviewer",
+    "done": None,
+}
+PHASE_RE = re.compile(r"^Phase:\s*([A-Za-z-]+)", re.MULTILINE)
 PLANS = Path("docs") / "exec-plans"
 
 
@@ -30,7 +37,9 @@ def plan_folder(root, arg):
     p = (root / arg).resolve() if not Path(arg).is_absolute() else Path(arg).resolve()
     allowed = (root / PLANS).resolve()
     if allowed != p and allowed not in p.parents:
-        raise SystemExit(f"refusing '{arg}': plan folders must be inside docs/exec-plans/")
+        raise SystemExit(
+            f"refusing '{arg}': plan folders must be inside docs/exec-plans/"
+        )
     return p
 
 
@@ -45,12 +54,16 @@ def status(root):
         ph = read_phase(f)
         rel = f.parent.relative_to(root).as_posix()
         if ph not in PHASES:
-            print(f"{rel}: INVALID or missing Phase ({ph!r}). Set one of {sorted(PHASES)} (python phase.py set).")
+            print(
+                f"{rel}: INVALID or missing Phase ({ph!r}). Set one of {sorted(PHASES)} (python phase.py set)."
+            )
             bad += 1
         elif PHASES[ph] is None:
-            print(f"{rel}: Phase={ph}. Finished. Move it to docs/exec-plans/completed/ when merged.")
+            print(
+                f"{rel}: Phase={ph}. Finished. Move it to docs/exec-plans/completed/ when merged."
+            )
         else:
-            print(f"{rel}: Phase={ph}. Next: switch to {PHASES[ph]} and send \"resume\".")
+            print(f'{rel}: Phase={ph}. Next: switch to {PHASES[ph]} and send "resume".')
     return 1 if bad else 0
 
 
@@ -73,7 +86,9 @@ def put_review(root, folder, content):
     d = plan_folder(root, folder)
     if not d.is_dir():
         raise SystemExit(f"{d} is not an existing plan folder")
-    (d / "03-review.md").write_text(content if content.endswith("\n") else content + "\n")
+    (d / "03-review.md").write_text(
+        content if content.endswith("\n") else content + "\n"
+    )
     print("wrote 03-review.md")
     return 0
 

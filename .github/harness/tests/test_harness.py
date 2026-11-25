@@ -9,9 +9,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]
 S = REPO / ".github" / "harness" / "scripts"
 sys.path.insert(0, str(S))
-import harness_lint  # noqa: E402
-import scope_check  # noqa: E402
-import standards_cache  # noqa: E402
+import harness_lint
+import scope_check
+import standards_cache
 
 TODAY = datetime.date(2026, 11, 21)
 
@@ -30,7 +30,8 @@ def make_repo(root, agents, agents_md_lines=10, review="2027-02-21"):
         (root / ".github/agents" / f"{n}.agent.md").write_text(t)
     (root / "AGENTS.md").write_text("line\n" * agents_md_lines)
     (root / ".github/harness/CONTROLS.md").write_text(
-        f"| Control | Why | Enforcement | Review by |\n|---|---|---|---|\n| c | w | script | {review} |\n")
+        f"| Control | Why | Enforcement | Review by |\n|---|---|---|---|\n| c | w | script | {review} |\n"
+    )
 
 
 def errs(root, today=TODAY):
@@ -57,11 +58,22 @@ class LintTests(unittest.TestCase):
         self.assertTrue(any("'*'" in e for e in errs(self.root)))
 
     def test_missing_tools_fail(self):
-        make_repo(self.root, {"a": "---\ndescription: x. Use when a. Not for b.\ndisable-model-invocation: true\n---\nb\n"})
+        make_repo(
+            self.root,
+            {
+                "a": "---\ndescription: x. Use when a. Not for b.\ndisable-model-invocation: true\n---\nb\n"
+            },
+        )
         self.assertTrue(any("'tools' must be" in e for e in errs(self.root)))
 
     def test_read_only_role_with_edit_fails_but_other_role_may_edit(self):
-        make_repo(self.root, {"explorer": agent(tools="['read','edit']"), "coder": agent(tools="['read','edit']")})
+        make_repo(
+            self.root,
+            {
+                "explorer": agent(tools="['read','edit']"),
+                "coder": agent(tools="['read','edit']"),
+            },
+        )
         e = errs(self.root)
         self.assertEqual(len([x for x in e if "read-only" in x]), 1)
         self.assertIn("explorer", [x for x in e if "read-only" in x][0])
@@ -90,7 +102,12 @@ class LintTests(unittest.TestCase):
 
 
 def git(root, *a):
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", *a],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
 
 
 class ScopeTests(unittest.TestCase):
@@ -104,7 +121,9 @@ class ScopeTests(unittest.TestCase):
         plan_dir = self.root / "docs/exec-plans/active/x"
         plan_dir.mkdir(parents=True)
         self.plan = plan_dir / "01-plan.md"
-        self.plan.write_text("---\nbase: main\nallowed_files:\n  - src/*.c\n---\nplan\n")
+        self.plan.write_text(
+            "---\nbase: main\nallowed_files:\n  - src/*.c\n---\nplan\n"
+        )
         git(self.root, "add", "-A")
         git(self.root, "commit", "-m", "base")
         git(self.root, "switch", "-c", "agent/x")
@@ -148,8 +167,14 @@ class ScopeTests(unittest.TestCase):
 
 
 def run_verify(root, *args):
-    r = subprocess.run([sys.executable, str(S / "verify.py"), "--root", str(root), *args], capture_output=True, text=True)
-    return r.returncode, (json.loads(r.stdout) if r.stdout.strip().startswith("{") else r.stdout)
+    r = subprocess.run(
+        [sys.executable, str(S / "verify.py"), "--root", str(root), *args],
+        capture_output=True,
+        text=True,
+    )
+    return r.returncode, (
+        json.loads(r.stdout) if r.stdout.strip().startswith("{") else r.stdout
+    )
 
 
 class VerifyTests(unittest.TestCase):
@@ -171,14 +196,21 @@ class VerifyTests(unittest.TestCase):
         self.assertEqual(rep["claims"], ["a: passed", "b: passed"])
 
     def test_fail_fast_reports_not_run(self):
-        self.gates([{"name": "a", "command": "echo boom; false"}, {"name": "b", "command": "true"}])
+        self.gates(
+            [
+                {"name": "a", "command": "echo boom; false"},
+                {"name": "b", "command": "true"},
+            ]
+        )
         rc, rep = run_verify(self.root)
         self.assertEqual(rc, 1)
         self.assertEqual(rep["not_run"], ["b"])
         self.assertIn("boom", rep["results"][0]["output_tail"])
 
     def test_preexisting_failure_does_not_block(self):
-        self.gates([{"name": "a", "command": "false"}, {"name": "b", "command": "true"}])
+        self.gates(
+            [{"name": "a", "command": "false"}, {"name": "b", "command": "true"}]
+        )
         self.assertEqual(run_verify(self.root, "--baseline")[0], 0)
         rc, rep = run_verify(self.root)
         self.assertEqual(rc, 0)
@@ -209,7 +241,10 @@ class CacheTests(unittest.TestCase):
         self.t.cleanup()
 
     def payload(self):
-        return {"sources": ["Makefile"], "gates": [{"name": "build", "command": "make", "verified": True}]}
+        return {
+            "sources": ["Makefile"],
+            "gates": [{"name": "build", "command": "make", "verified": True}],
+        }
 
     def test_missing_then_fresh_then_stale_on_change(self):
         self.assertEqual(standards_cache.check(self.root)[0], "MISSING")

@@ -10,9 +10,8 @@ REPO = Path(__file__).resolve().parents[3]
 S = REPO / ".github" / "harness" / "scripts"
 sys.path.insert(0, str(S))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import harness_lint  # noqa: E402
-import phase  # noqa: E402
-from test_harness import agent, make_repo  # noqa: E402
+import harness_lint
+from test_harness import agent, make_repo
 
 TODAY = datetime.date(2026, 11, 21)
 
@@ -25,13 +24,17 @@ def lint_one(name, text):
 
 class LocalOnlyFieldTests(unittest.TestCase):
     def test_each_local_only_field_is_rejected(self):
-        extras = {"handoffs": "handoffs:\n  - label: go\n    agent: b\n    prompt: hi\n",
-                  "agents": "agents: ['b']\n",
-                  "argument-hint": "argument-hint: some hint\n",
-                  "advancedOptions": "advancedOptions: x\n"}
+        extras = {
+            "handoffs": "handoffs:\n  - label: go\n    agent: b\n    prompt: hi\n",
+            "agents": "agents: ['b']\n",
+            "argument-hint": "argument-hint: some hint\n",
+            "advancedOptions": "advancedOptions: x\n",
+        }
         for field, extra in extras.items():
             e = lint_one("a", agent(extra=extra))
-            self.assertTrue(any(f"'{field}' is Local-harness-only" in x for x in e), field)
+            self.assertTrue(
+                any(f"'{field}' is Local-harness-only" in x for x in e), field
+            )
 
     def test_agent_without_them_passes(self):
         self.assertEqual(lint_one("a", agent()), [])
@@ -39,31 +42,68 @@ class LocalOnlyFieldTests(unittest.TestCase):
 
 class SubagentInvocabilityTests(unittest.TestCase):
     def test_non_helper_must_disable_model_invocation(self):
-        no_flag = "---\ndescription: x. Use when a. Not for b.\ntools: ['read']\n---\nb\n"
-        self.assertTrue(any("disable-model-invocation: true" in x for x in lint_one("coder", no_flag)))
-        false_flag = agent().replace("disable-model-invocation: true", "disable-model-invocation: false")
-        self.assertTrue(any("disable-model-invocation: true" in x for x in lint_one("coder", false_flag)))
+        no_flag = (
+            "---\ndescription: x. Use when a. Not for b.\ntools: ['read']\n---\nb\n"
+        )
+        self.assertTrue(
+            any(
+                "disable-model-invocation: true" in x
+                for x in lint_one("coder", no_flag)
+            )
+        )
+        false_flag = agent().replace(
+            "disable-model-invocation: true", "disable-model-invocation: false"
+        )
+        self.assertTrue(
+            any(
+                "disable-model-invocation: true" in x
+                for x in lint_one("coder", false_flag)
+            )
+        )
         self.assertEqual(lint_one("coder", agent()), [])
 
     def test_helper_must_be_hidden_and_invocable(self):
         helper_ok = agent(tools="['read']", helper=True)
         self.assertEqual(lint_one("explorer", helper_ok), [])
-        picker_visible = "---\ndescription: x. Use when a. Not for b.\ntools: ['read']\n---\nb\n"
-        self.assertTrue(any("user-invocable: false" in x for x in lint_one("explorer", picker_visible)))
+        picker_visible = (
+            "---\ndescription: x. Use when a. Not for b.\ntools: ['read']\n---\nb\n"
+        )
+        self.assertTrue(
+            any(
+                "user-invocable: false" in x
+                for x in lint_one("explorer", picker_visible)
+            )
+        )
         blocked = agent(helper=True, extra="disable-model-invocation: true\n")
-        self.assertTrue(any("must stay invocable" in x for x in lint_one("explorer", blocked)))
+        self.assertTrue(
+            any("must stay invocable" in x for x in lint_one("explorer", blocked))
+        )
 
 
 class ToolRuleTests(unittest.TestCase):
     def test_agent_tool_only_for_delegators(self):
         t = "['read','agent']"
-        self.assertTrue(any("not a delegator" in x for x in lint_one("coder", agent(tools=t))))
+        self.assertTrue(
+            any("not a delegator" in x for x in lint_one("coder", agent(tools=t)))
+        )
         for ok in ("strategizer", "planner", "ask"):
-            self.assertEqual([x for x in lint_one(ok, agent(tools=t)) if "delegator" in x], [], ok)
+            self.assertEqual(
+                [x for x in lint_one(ok, agent(tools=t)) if "delegator" in x], [], ok
+            )
 
     def test_unknown_tool_alias_flagged_qualified_and_known_pass(self):
-        self.assertTrue(any("unknown tool 'bash'" in x for x in lint_one("a", agent(tools="['read','bash']"))))
-        self.assertEqual(lint_one("a", agent(tools="['read','search','web','todo','vscode/askQuestions']")), [])
+        self.assertTrue(
+            any(
+                "unknown tool 'bash'" in x
+                for x in lint_one("a", agent(tools="['read','bash']"))
+            )
+        )
+        self.assertEqual(
+            lint_one(
+                "a", agent(tools="['read','search','web','todo','vscode/askQuestions']")
+            ),
+            [],
+        )
 
 
 class RepoConsistencyTests(unittest.TestCase):
@@ -74,7 +114,7 @@ class RepoConsistencyTests(unittest.TestCase):
         for f in list((REPO / ".github/agents").glob("*.md")) + [REPO / "AGENTS.md"]:
             t = f.read_text().lower()
             self.assertNotIn("handoff button", t, f.name)
-            self.assertNotIn("propose as a rule\"", t.replace("`", ""), f.name)
+            self.assertNotIn('propose as a rule"', t.replace("`", ""), f.name)
 
     def test_phase_agents_use_phase_protocol_and_print_next(self):
         for name in ("strategizer", "planner", "coder", "reviewer"):
@@ -83,8 +123,11 @@ class RepoConsistencyTests(unittest.TestCase):
             self.assertIn("Next:", t, name)
 
     def test_only_expected_agents_hold_the_agent_tool(self):
-        holders = {f.name[:-len(".agent.md")] for f in (REPO / ".github/agents").glob("*.agent.md")
-                   if "'agent'" in f.read_text().split("\n---\n")[0]}
+        holders = {
+            f.name[: -len(".agent.md")]
+            for f in (REPO / ".github/agents").glob("*.agent.md")
+            if "'agent'" in f.read_text().split("\n---\n")[0]
+        }
         self.assertEqual(holders, {"strategizer", "planner", "ask"})
 
     def test_reviewer_has_no_edit_tool_but_a_write_path(self):
@@ -113,17 +156,30 @@ class PhaseTests(unittest.TestCase):
         return d
 
     def run_cli(self, *args, stdin=""):
-        r = subprocess.run([sys.executable, str(S / "phase.py"), *args, "--root", str(self.root)],
-                           input=stdin, capture_output=True, text=True)
+        r = subprocess.run(
+            [sys.executable, str(S / "phase.py"), *args, "--root", str(self.root)],
+            input=stdin,
+            capture_output=True,
+            text=True,
+        )
         return r.returncode, r.stdout + r.stderr
 
     def test_status_names_next_agent_per_phase(self):
-        for slug, ph, agent_name in [("a", "brief", "strategizer"), ("b", "plan", "planner"),
-                                     ("c", "implement", "coder"), ("d", "review", "reviewer")]:
+        for slug, ph, agent_name in [
+            ("a", "brief", "strategizer"),
+            ("b", "plan", "planner"),
+            ("c", "implement", "coder"),
+            ("d", "review", "reviewer"),
+        ]:
             self.plan(slug, f"Phase: {ph}")
         rc, out = self.run_cli("status")
         self.assertEqual(rc, 0)
-        for slug, agent_name in [("a", "strategizer"), ("b", "planner"), ("c", "coder"), ("d", "reviewer")]:
+        for slug, agent_name in [
+            ("a", "strategizer"),
+            ("b", "planner"),
+            ("c", "coder"),
+            ("d", "reviewer"),
+        ]:
             self.assertRegex(out, rf"{slug}: Phase=\w+\. Next: switch to {agent_name}")
 
     def test_done_plan_has_no_next_agent(self):
@@ -149,7 +205,11 @@ class PhaseTests(unittest.TestCase):
         self.assertIn("No active plans", out)
 
     def test_set_changes_only_the_phase_line(self):
-        d = self.plan("x", "Phase: plan", extra="\n## Steps\n- [x] 1 keep me\nPhase mentioned in prose stays.\n")
+        d = self.plan(
+            "x",
+            "Phase: plan",
+            extra="\n## Steps\n- [x] 1 keep me\nPhase mentioned in prose stays.\n",
+        )
         before = (d / "02-progress.md").read_text()
         rc, _ = self.run_cli("set", "docs/exec-plans/active/x", "implement")
         after = (d / "02-progress.md").read_text()
@@ -165,10 +225,14 @@ class PhaseTests(unittest.TestCase):
 
     def test_put_review_writes_only_the_review(self):
         d = self.plan("x")
-        rc, _ = self.run_cli("put-review", "docs/exec-plans/active/x", stdin="# Review\nall met\n")
+        rc, _ = self.run_cli(
+            "put-review", "docs/exec-plans/active/x", stdin="# Review\nall met\n"
+        )
         self.assertEqual(rc, 0)
         self.assertEqual((d / "03-review.md").read_text(), "# Review\nall met\n")
-        self.assertEqual(sorted(p.name for p in d.iterdir()), ["02-progress.md", "03-review.md"])
+        self.assertEqual(
+            sorted(p.name for p in d.iterdir()), ["02-progress.md", "03-review.md"]
+        )
 
     def test_put_review_refuses_empty_input(self):
         d = self.plan("x")
@@ -185,7 +249,9 @@ class PhaseTests(unittest.TestCase):
         self.assertFalse((self.root / "src/03-review.md").exists())
         rc, _ = self.run_cli("set", "src", "done")
         self.assertNotEqual(rc, 0)
-        self.assertEqual((self.root / "src/02-progress.md").read_text(), "Phase: plan\n")
+        self.assertEqual(
+            (self.root / "src/02-progress.md").read_text(), "Phase: plan\n"
+        )
 
 
 if __name__ == "__main__":

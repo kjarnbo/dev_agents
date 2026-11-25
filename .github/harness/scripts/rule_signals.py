@@ -9,6 +9,7 @@ remembering to look, and so the rule-curator gets an objective second opinion.
   mark ID [ID...]            mark candidates as reviewed (the hook will not log them again)
 Logs live in .github/cache/ (git-ignored). Only rule-like sentences are stored, never whole prompts.
 """
+
 import argparse
 import datetime
 import hashlib
@@ -39,8 +40,8 @@ ONE_OFF = {
     "scoped_here": r"\b(for|in|only in|just in) this (task|pr|change|file|function|commit|branch|case|one|class)\b",
     "temporal": r"\b(right now|today|temporarily|at the moment)\b",
 }
-GENERAL = {k: re.compile(v, re.I) for k, v in GENERAL.items()}
-ONE_OFF = {k: re.compile(v, re.I) for k, v in ONE_OFF.items()}
+GENERAL = {k: re.compile(v, re.IGNORECASE) for k, v in GENERAL.items()}
+ONE_OFF = {k: re.compile(v, re.IGNORECASE) for k, v in ONE_OFF.items()}
 MIN_LEN, MAX_LEN = 12, 300
 
 
@@ -63,8 +64,22 @@ def classify(text):
         if best is None or sc > best["score"]:
             best = {"score": sc, "general": g, "one_off": o, "statement": s}
     if best is None:
-        return {"label": "none", "score": 0, "general": [], "one_off": [], "statement": ""}
-    label = "rule" if best["score"] >= 2 else "likely_rule" if best["score"] == 1 else "one_off" if best["one_off"] else "none"
+        return {
+            "label": "none",
+            "score": 0,
+            "general": [],
+            "one_off": [],
+            "statement": "",
+        }
+    label = (
+        "rule"
+        if best["score"] >= 2
+        else "likely_rule"
+        if best["score"] == 1
+        else "one_off"
+        if best["one_off"]
+        else "none"
+    )
     return {"label": label, **best}
 
 
@@ -92,7 +107,11 @@ def _reviewed(root):
 
 def _entries(root):
     f = _paths(root)[1]
-    return [json.loads(x) for x in f.read_text().splitlines() if x.strip()] if f.exists() else []
+    return (
+        [json.loads(x) for x in f.read_text().splitlines() if x.strip()]
+        if f.exists()
+        else []
+    )
 
 
 def log_candidate(root, text):
@@ -104,8 +123,14 @@ def log_candidate(root, text):
         return None
     cache, f, _ = _paths(root)
     cache.mkdir(parents=True, exist_ok=True)
-    entry = {"id": i, "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-             "label": r["label"], "score": r["score"], "signals": r["general"], "statement": r["statement"]}
+    entry = {
+        "id": i,
+        "ts": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
+        "label": r["label"],
+        "score": r["score"],
+        "signals": r["general"],
+        "statement": r["statement"],
+    }
     with f.open("a") as fh:
         fh.write(json.dumps(entry) + "\n")
     return entry

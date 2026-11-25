@@ -7,6 +7,7 @@ Staleness is decided by content hashes of source files, not by a calendar timer.
   check            -> FRESH (exit 0) | STALE/MISSING (exit 1)
   write  < json    -> {"sources": [paths], "gates": [{"name","command","verified"}], "pointers": {}, "unknown": []}
 """
+
 import argparse
 import datetime
 import hashlib
@@ -35,7 +36,11 @@ def check(root):
             reasons.append(f"{rel}: deleted")
         elif sha(f) != h:
             reasons.append(f"{rel}: changed")
-    reasons += [f"gate '{g['name']}' unverified" for g in data.get("gates", []) if not g.get("verified")]
+    reasons += [
+        f"gate '{g['name']}' unverified"
+        for g in data.get("gates", [])
+        if not g.get("verified")
+    ]
     return ("STALE" if reasons else "FRESH"), reasons
 
 
@@ -48,11 +53,19 @@ def write(root, payload):
             raise SystemExit("each gate needs string 'name' and 'command'")
     missing = [s for s in payload["sources"] if not (Path(root) / s).exists()]
     if missing:
-        raise SystemExit(f"source files not found: {missing}. Only list files you actually read.")
-    out = {"version": 1,
-           "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-           "sources": {s: sha(Path(root) / s) for s in payload["sources"]},
-           "gates": payload["gates"], "pointers": payload.get("pointers", {}), "unknown": payload.get("unknown", [])}
+        raise SystemExit(
+            f"source files not found: {missing}. Only list files you actually read."
+        )
+    out = {
+        "version": 1,
+        "generated_at": datetime.datetime.now(datetime.UTC).isoformat(
+            timespec="seconds"
+        ),
+        "sources": {s: sha(Path(root) / s) for s in payload["sources"]},
+        "gates": payload["gates"],
+        "pointers": payload.get("pointers", {}),
+        "unknown": payload.get("unknown", []),
+    }
     cp = cache_path(root)
     cp.parent.mkdir(parents=True, exist_ok=True)
     cp.write_text(json.dumps(out, indent=2))

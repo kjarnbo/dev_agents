@@ -1,4 +1,5 @@
 """Minimal YAML-frontmatter reader (stdlib only). Handles scalars, inline lists, block lists."""
+
 import re
 
 
@@ -32,4 +33,4 @@ def parse(text):
                     fm[key] = []
                 if isinstance(fm[key], list):
                     fm[key].append(item.group(1).strip().strip("'\""))
-    return fm, "\n".join(lines[end + 1:])
+    return fm, "\n".join(lines[end + 1 :])

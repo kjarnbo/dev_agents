@@ -8,6 +8,7 @@ off the tail). To dig deeper, grep the saved log; never paste it whole.
   --baseline   run all gates on the untouched tree and record which already fail
 Exit: 0 no NEW failure, 1 new failure, 2 no gates configured.
 """
+
 import argparse
 import json
 import re
@@ -17,7 +18,7 @@ from pathlib import Path
 
 TAIL = 40
 MAX_ERROR_LINES = 10
-ERR = re.compile(r"\b(error|fatal|failed|failure)\b", re.I)
+ERR = re.compile(r"\b(error|fatal|failed|failure)\b", re.IGNORECASE)
 
 
 def load_gates(root):
@@ -26,14 +27,24 @@ def load_gates(root):
         return json.loads(human.read_text())
     cache = root / ".github" / "cache" / "standards.json"
     if cache.exists():
-        return [g for g in json.loads(cache.read_text()).get("gates", []) if g.get("verified")]
+        return [
+            g
+            for g in json.loads(cache.read_text()).get("gates", [])
+            if g.get("verified")
+        ]
     return []
 
 
 def run(gate, root, timeout):
     try:
-        r = subprocess.run(gate["command"], shell=True, cwd=root / gate.get("cwd", "."),
-                           capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(
+            gate["command"],
+            shell=True,
+            cwd=root / gate.get("cwd", "."),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
         out, rc = (r.stdout + r.stderr), r.returncode
     except subprocess.TimeoutExpired:
         out, rc = f"TIMEOUT after {timeout}s", 124
@@ -49,13 +60,17 @@ def main():
     root = Path(a.root).resolve()
     gates = load_gates(root)
     if not gates:
-        print("No gates configured. Run the standards-discoverer agent, or create .github/harness/gates.json "
-              'as [{"name": "build", "command": "..."}] ordered fastest first.')
+        print(
+            "No gates configured. Run the standards-discoverer agent, or create .github/harness/gates.json "
+            'as [{"name": "build", "command": "..."}] ordered fastest first.'
+        )
         return 2
     cache = root / ".github" / "cache"
     cache.mkdir(parents=True, exist_ok=True)
     bfile = cache / "baseline.json"
-    baseline = json.loads(bfile.read_text()) if bfile.exists() and not a.baseline else {}
+    baseline = (
+        json.loads(bfile.read_text()) if bfile.exists() and not a.baseline else {}
+    )
     results, not_run, stop = [], [], False
     for g in gates:
         if stop:
@@ -73,16 +88,34 @@ def main():
             status = "failed_preexisting"
         else:
             status = "failed"
-        results.append({"gate": g["name"], "command": g["command"], "exit_code": rc, "status": status,
-                        "output_tail": "\n".join(lines[-TAIL:]) if rc else "",
-                        "error_lines": [x for x in lines if ERR.search(x)][:MAX_ERROR_LINES] if rc else [],
-                        "log": logfile.relative_to(root).as_posix()})
+        results.append(
+            {
+                "gate": g["name"],
+                "command": g["command"],
+                "exit_code": rc,
+                "status": status,
+                "output_tail": "\n".join(lines[-TAIL:]) if rc else "",
+                "error_lines": [x for x in lines if ERR.search(x)][:MAX_ERROR_LINES]
+                if rc
+                else [],
+                "log": logfile.relative_to(root).as_posix(),
+            }
+        )
         if status == "failed" and not a.baseline:
             stop = True
     if a.baseline:
-        bfile.write_text(json.dumps({r["gate"]: r["exit_code"] for r in results}, indent=2))
-    claims = [f"{r['gate']}: {r['status'].replace('_', ' ')}" for r in results] + [f"{n}: NOT RUN" for n in not_run]
-    report = {"baseline_recorded": a.baseline, "results": results, "not_run": not_run, "claims": claims}
+        bfile.write_text(
+            json.dumps({r["gate"]: r["exit_code"] for r in results}, indent=2)
+        )
+    claims = [f"{r['gate']}: {r['status'].replace('_', ' ')}" for r in results] + [
+        f"{n}: NOT RUN" for n in not_run
+    ]
+    report = {
+        "baseline_recorded": a.baseline,
+        "results": results,
+        "not_run": not_run,
+        "claims": claims,
+    }
     (cache / "last_verify.json").write_text(json.dumps(report, indent=2))
     print(json.dumps(report, indent=2))
     return 1 if any(r["status"] == "failed" for r in results) and not a.baseline else 0
