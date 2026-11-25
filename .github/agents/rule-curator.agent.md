@@ -1,8 +1,8 @@
 ---
 name: rule-curator
-description: Decides whether something the user said is a durable rule, and if so proposes where it belongs and how to enforce it. Proposes first; changes rules only after the user approves.
+description: Decides whether something the user said is a durable rule, then proposes where it belongs and how to enforce it. Use when the user states a lasting preference or says review candidates. Not for task instructions that apply once.
 tools: ['search', 'read', 'edit', 'execute']
-agents: []
+disable-model-invocation: true
 ---
 
 # Rule curator

@@ -1,4 +1,7 @@
 # Progress (resume point)
+Phase: brief
+(Phase names the NEXT phase to run: brief=strategizer, plan=planner, implement=coder, review=reviewer, done)
+
 Status: not started | in progress | blocked | done
 Branch: agent/<slug>   Baseline recorded: no
 

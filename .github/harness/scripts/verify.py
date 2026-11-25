@@ -2,17 +2,22 @@
 """Run verification gates in order, fail fast, report scoped claims. Stdlib only.
 
 Gates come from .github/harness/gates.json (human-owned, wins) or from the verified
-gates in .github/cache/standards.json. Output per gate is bounded to the last 40 lines.
+gates in .github/cache/standards.json. Context-safe output: each gate's FULL output is saved to .github/cache/gate-logs/<name>.log;
+the report carries only the last 40 lines plus up to 10 error-looking lines (build errors often scroll
+off the tail). To dig deeper, grep the saved log; never paste it whole.
   --baseline   run all gates on the untouched tree and record which already fail
 Exit: 0 no NEW failure, 1 new failure, 2 no gates configured.
 """
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 TAIL = 40
+MAX_ERROR_LINES = 10
+ERR = re.compile(r"\b(error|fatal|failed|failure)\b", re.I)
 
 
 def load_gates(root):
@@ -32,7 +37,7 @@ def run(gate, root, timeout):
         out, rc = (r.stdout + r.stderr), r.returncode
     except subprocess.TimeoutExpired:
         out, rc = f"TIMEOUT after {timeout}s", 124
-    return rc, "\n".join(out.strip().splitlines()[-TAIL:])
+    return rc, out.strip()
 
 
 def main():
@@ -56,7 +61,12 @@ def main():
         if stop:
             not_run.append(g["name"])
             continue
-        rc, tail = run(g, root, a.timeout)
+        rc, full = run(g, root, a.timeout)
+        lines = full.splitlines()
+        logdir = cache / "gate-logs"
+        logdir.mkdir(parents=True, exist_ok=True)
+        logfile = logdir / (re.sub(r"[^A-Za-z0-9_.-]", "_", g["name"]) + ".log")
+        logfile.write_text(full)
         if rc == 0:
             status = "passed"
         elif baseline.get(g["name"], 0) != 0:
@@ -64,7 +74,9 @@ def main():
         else:
             status = "failed"
         results.append({"gate": g["name"], "command": g["command"], "exit_code": rc, "status": status,
-                        "output_tail": tail if rc else ""})
+                        "output_tail": "\n".join(lines[-TAIL:]) if rc else "",
+                        "error_lines": [x for x in lines if ERR.search(x)][:MAX_ERROR_LINES] if rc else [],
+                        "log": logfile.relative_to(root).as_posix()})
         if status == "failed" and not a.baseline:
             stop = True
     if a.baseline:

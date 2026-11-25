@@ -5,14 +5,8 @@
       {
         "type": "command",
         "bash": "python3 .github/harness/scripts/rule_signals.py --hook",
-        "powershell": "python .github/harness/scripts/rule_signals.py --hook"
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "type": "command",
-        "bash": "python3 .github/harness/scripts/rule_signals.py --hook",
-        "powershell": "python .github/harness/scripts/rule_signals.py --hook"
+        "powershell": "python .github/harness/scripts/rule_signals.py --hook",
+        "timeoutSec": 10
       }
     ]
   }

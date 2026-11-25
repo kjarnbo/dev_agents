@@ -3,11 +3,15 @@
 Three phase agents, helpers, a read-only `ask` agent, a `rule-curator`, and scripts for everything a machine can check.
 
 ```
-user ─▶ strategizer ─▶ planner ─▶ coder ─▶ reviewer        (≤ 3 handoffs, each a button YOU click)
-          │  └ standards-discoverer, explorer   └ explorer
-          ▼
-   docs/exec-plans/active/<date>-<slug>/   00-brief.md → 01-plan.md → 02-progress.md → 03-review.md
+strategizer ─▶ planner ─▶ coder ─▶ reviewer     (you switch agents; each prints "Next: ..." when its phase is done)
+     │             │
+     └─ standards-discoverer, explorer (subagents, hidden from the picker)
+
+docs/exec-plans/active/<date>-<slug>/   00-brief.md → 01-plan.md → 02-progress.md (Phase: ...) → 03-review.md
 ```
+
+**Requires the Copilot harness** (Session Target: *Copilot*). The Local harness is deprecated and removed in Feb 2027;
+its `handoffs` buttons do not exist in the Copilot harness, so this workflow does not use them.
 
 | Agent | Job | Tools (least privilege) |
 |---|---|---|
@@ -22,35 +26,40 @@ user ─▶ strategizer ─▶ planner ─▶ coder ─▶ reviewer        (≤ 
 
 ## Usage
 1. Pick `strategizer`, describe the request. Review `00-brief.md`.
-2. Click **Plan this brief**. Review `01-plan.md` (this is the cheapest place to catch mistakes).
-3. Click **Implement this plan**. The coder commits one step at a time on `agent/<slug>`.
-4. Click **Independent review**. Read `03-review.md`.
+2. Switch to `planner`, send **resume**. Review `01-plan.md` (the cheapest place to catch mistakes).
+3. Switch to `coder`, send **resume**. It commits one step at a time on `agent/<slug>`.
+4. Switch to `reviewer`, send **review**. Read `03-review.md`, then merge the branch.
+
+Lost track? `python .github/harness/scripts/phase.py status` prints each plan's phase and which agent to pick next.
+Each agent also checks `Phase:` itself: if you pick the wrong one, it names the right one and stops.
 
 ## Explore without changing anything
 Pick `ask` and ask anything: "where does X get its default?", "how does Y work end to end?", "what depends on Z?".
 Answers lead with the result, then a `path:symbol` trace, with each claim marked Confirmed, Inferred or Not found.
-It has no edit or execute tools. Use **Turn this into a change request** to move into the workflow.
+It has no edit or execute tools. To make a change, switch to `strategizer` and describe it.
 
 ## Rules: capture, propose, approve
 If you say something durable ("always...", "never...", "from now on...", "we use..."), it is caught two ways:
 a hook (`.github/hooks/rule-signals.json`) logs rule-like sentences to `.github/cache/rule-candidates.jsonl`,
 and phase agents end their reply with a "Possible general rule" line. Neither changes any rule.
-Open `rule-curator` (or click **Propose as a rule**) and say "review candidates". It classifies each one
+Switch to `rule-curator` and say "review candidates". It classifies each one
 (rule / one-off / unclear), checks duplicates, picks a destination, and writes
 `.github/harness/proposals/<date>-<slug>.md`. You then say `apply <slug>` or `reject <slug> <reason>`.
 Destinations: a script or frontmatter control (preferred), an agent file, or `docs/rules/<topic>.md` for project conventions.
 
 ## If you hit a rate limit or lose the chat
-State is in files. Start a new chat, select the agent for the current phase, say **"resume"**.
+State is in files. Run `phase.py status`, start a new chat, select the agent it names, say **"resume"**.
 It reads `02-progress.md` and continues from the first unchecked step. Fewer subagents also means fewer requests per run.
 
 ## What is enforced by machine (see `.github/harness/CONTROLS.md`)
-- Tool lists per agent (frontmatter): helpers cannot edit; coder cannot spawn agents.
+- Tool lists per agent (frontmatter): helpers cannot edit; only strategizer, planner and ask hold the `agent` tool.
+- Subagent control: only `explorer` and `standards-discoverer` can be invoked as subagents; all others set `disable-model-invocation: true`.
+- `phase.py`: the `Phase:` state machine; the reviewer has no edit tool and writes only `03-review.md` through it.
 - `scope_check.py`: only files in the plan's `allowed_files` may change; no work on main/master.
-- `verify.py`: gates in order, fail fast, pre-existing failures reported separately, output bounded.
+- `verify.py`: gates in order, fail fast, pre-existing failures reported separately. Context-safe: bounded tail plus early error lines, full output saved under `.github/cache/gate-logs/`.
 - `standards_cache.py`: cache holds verified commands + pointers, invalidated by content hash.
 - `rule_signals.py`: deterministic rule detection (hook) plus candidate bookkeeping.
-- `harness_lint.py` (CI): `ask`/`explorer` cannot execute, proposals and hooks valid, AGENTS.md ≤ 100 lines, agent bodies ≤ 90, hop chain ≤ 4, no `*` tools, controls not past review date.
+- `harness_lint.py` (CI): no Local-only frontmatter, descriptions follow the routing contract and are valid YAML, `ask`/`explorer` cannot execute, proposals and hooks valid, AGENTS.md ≤ 100 lines, agent bodies ≤ 90, no `*` tools, controls not past review date.
 
 Advisory only (prose, may be ignored): coder repair limit, reviewer independence, brief quality, the in-chat rule flag.
 

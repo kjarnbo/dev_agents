@@ -16,8 +16,10 @@ import standards_cache  # noqa: E402
 TODAY = datetime.date(2026, 11, 21)
 
 
-def agent(tools="['read']", agents="[]", extra="", body="Body\n"):
-    return f"---\ndescription: d\ntools: {tools}\nagents: {agents}\n{extra}---\n{body}"
+def agent(tools="['read']", extra="", body="Body\n", helper=False):
+    """A lint-clean Copilot-harness agent. helper=True makes it a subagent-only helper."""
+    flag = "user-invocable: false" if helper else "disable-model-invocation: true"
+    return f"---\ndescription: x. Use when a. Not for b.\ntools: {tools}\n{flag}\n{extra}---\n{body}"
 
 
 def make_repo(root, agents, agents_md_lines=10, review="2027-02-21"):
@@ -55,7 +57,7 @@ class LintTests(unittest.TestCase):
         self.assertTrue(any("'*'" in e for e in errs(self.root)))
 
     def test_missing_tools_fail(self):
-        make_repo(self.root, {"a": "---\ndescription: d\nagents: []\n---\nb\n"})
+        make_repo(self.root, {"a": "---\ndescription: x. Use when a. Not for b.\ndisable-model-invocation: true\n---\nb\n"})
         self.assertTrue(any("'tools' must be" in e for e in errs(self.root)))
 
     def test_read_only_role_with_edit_fails_but_other_role_may_edit(self):
@@ -63,14 +65,6 @@ class LintTests(unittest.TestCase):
         e = errs(self.root)
         self.assertEqual(len([x for x in e if "read-only" in x]), 1)
         self.assertIn("explorer", [x for x in e if "read-only" in x][0])
-
-    def test_agents_key_required(self):
-        make_repo(self.root, {"a": "---\ndescription: d\ntools: ['read']\n---\nb\n"})
-        self.assertTrue(any("'agents' is not set" in e for e in errs(self.root)))
-
-    def test_subagents_need_agent_tool(self):
-        make_repo(self.root, {"a": agent(agents="['b']"), "b": agent()})
-        self.assertTrue(any("lacks 'agent'" in e for e in errs(self.root)))
 
     def test_agents_md_boundary(self):
         make_repo(self.root, {"a": agent()}, agents_md_lines=100)
@@ -85,25 +79,6 @@ class LintTests(unittest.TestCase):
         r2 = Path(tempfile.mkdtemp())
         make_repo(r2, {"a": agent(body="x\n" * 91)})
         self.assertTrue(any("body is 91" in e for e in errs(r2)))
-
-    def _chain(self, n):
-        ag = {}
-        for i in range(n):
-            nxt = f"agent: a{i+1}\n" if i < n - 1 else ""
-            extra = f"handoffs:\n  - label: go\n    {nxt}" if nxt else ""
-            ag[f"a{i}"] = agent(extra=extra)
-        return ag
-
-    def test_chain_of_4_hops_ok_5_fails(self):
-        make_repo(self.root, self._chain(5))  # 5 agents = 4 hops
-        self.assertEqual(errs(self.root), [])
-        r2 = Path(tempfile.mkdtemp())
-        make_repo(r2, self._chain(6))  # 5 hops
-        self.assertTrue(any("5 hops" in e for e in errs(r2)))
-
-    def test_unknown_handoff_target_fails(self):
-        make_repo(self.root, {"a": agent(extra="handoffs:\n  - label: go\n    agent: ghost\n")})
-        self.assertTrue(any("ghost" in e for e in errs(self.root)))
 
     def test_expired_control_fails_unexpired_passes(self):
         make_repo(self.root, {"a": agent()}, review="2026-11-20")

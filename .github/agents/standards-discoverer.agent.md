@@ -1,8 +1,7 @@
 ---
 name: standards-discoverer
-description: Finds the project's verified build/test/lint commands and points at its authoritative style config. Caches the result with source hashes.
+description: Finds and verifies the project's build, test and lint commands and points at its style config. Use when .github/cache/standards.json is missing or stale. Not for answering questions about the code (use ask).
 tools: ['search', 'read', 'execute']
-agents: []
 user-invocable: false
 ---
 
